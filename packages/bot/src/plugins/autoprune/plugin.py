@@ -25,7 +25,7 @@ import typing
 import discord
 from discord.ext import tasks
 
-from ... import NotFound, Plugin
+from ... import InfractionEvent, NotFound, Plugin
 from .enums import ActivityType
 
 
@@ -47,7 +47,7 @@ def has_any_role(role_ids):
 
 
 def joined_before(config):
-    now = datetime.datetime.utcnow()
+    now = discord.utils.utcnow()
     timeout = config.inactive_timeout.total_seconds()
 
     async def check(member):
@@ -154,7 +154,9 @@ class AutoPrune(Plugin):
             activity_check = status_before(config, self.mousey)
 
         me = guild.me
+
         events = self.mousey.get_cog('Events')
+        reason = 'Automatic prune due to inactivity'
 
         for member in guild.members:
             if member.bot or member.top_role >= me.top_role:
@@ -165,12 +167,12 @@ class AutoPrune(Plugin):
                 continue
 
             if role_check(member) and await activity_check(member):
-                reason = 'Automatic prune due to inactivity'
-                events.ignore(guild, 'member_kick', guild, member)
+                event = InfractionEvent(guild, member, me, reason)
+                events.ignore(guild, 'mouse_member_kick', event)
 
                 try:
                     await member.kick(reason=reason)
                 except discord.HTTPException:
                     pass
                 else:
-                    self.mousey.dispatch('mouse_member_kick', guild, member, me, reason)
+                    self.mousey.dispatch('mouse_member_kick', event)

@@ -27,7 +27,7 @@ import typing
 import discord
 from discord.ext import commands
 
-from ... import LogType, NotFound, Plugin, bot_has_permissions, command, group
+from ... import ConfigUpdateEvent, LogType, NotFound, Plugin, bot_has_permissions, command, group
 from ...utils import Plural, code_safe
 from .converter import guild_prefix
 
@@ -132,13 +132,14 @@ class Config(Plugin):
                 {prefix}Choose what should be logged here:
 
                 `nothing`: Remove existing configuration
-                `everything`: Log everything into this channel
+                `default`: Logs every event in this channel
+                `everything`: Logs all `default` events and name changes
                 `custom`: Log specific events here
                 """
             )
         )
 
-        choices = ['nothing', 'everything', 'custom']
+        choices = ['nothing', 'default', 'everything', 'custom']
 
         def check(new):
             return common_check(new) and new.content in choices
@@ -158,6 +159,9 @@ class Config(Plugin):
                 pass
         elif action == 'everything':
             await self._update_modlog_channel(ctx.channel, -1)
+        elif action == 'default':
+            value = -1 & ~LogType.MEMBER_NAME_CHANGE.value
+            await self._update_modlog_channel(ctx.channel, value)
         else:
             choices = {x: event for x, event in enumerate(LogType)}
             names = '\n'.join(str(x) + ' ' + e.name.lower().replace('_', ' ') for x, e in choices.items())
@@ -188,7 +192,7 @@ class Config(Plugin):
 
             await self._update_modlog_channel(ctx.channel, value)
 
-        self.mousey.dispatch('mouse_config_update', ctx.guild)
+        self.mousey.dispatch('mouse_config_update', ConfigUpdateEvent(ctx.guild))
 
         await asyncio.sleep(0)
         await ctx.send(f'Log channel `#{code_safe(ctx.channel)}` successfully updated.')
@@ -440,13 +444,15 @@ class Config(Plugin):
         Example: `{prefix}reload`
         """
 
-        self.mousey.dispatch('mouse_config_update', ctx.guild)
+        event = ConfigUpdateEvent(ctx.guild)
+        self.mousey.dispatch('mouse_config_update', event)
+
         await ctx.send('Reloaded the config for the current server.')
 
     @Plugin.listener()
-    async def on_mouse_config_update(self, guild):
+    async def on_mouse_config_update(self, event):
         try:
-            del self._prefixes[guild.id]
+            del self._prefixes[event.guild.id]
         except KeyError:
             pass
 

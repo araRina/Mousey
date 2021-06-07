@@ -18,27 +18,8 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
-import discord
-from discord.ext import commands
+from .plugin import Moderation
 
 
-def has_any_permission(**permissions):
-    invalid = [x for x in permissions if x not in discord.Permissions.VALID_FLAGS]
-
-    if invalid:
-        raise TypeError(f'Invalid permissions specified: {invalid}')
-
-    def predicate(ctx):
-        perms = ctx.channel.permissions_for(ctx.author)
-
-        if perms.administrator:
-            return True
-
-        found = [getattr(perms, x) for x in permissions]
-
-        if any(found):
-            return True
-
-        raise commands.MissingPermissions([x for x in found if not x])
-
-    return commands.check(predicate)
+def setup(mousey):
+    mousey.add_cog(Moderation(mousey))

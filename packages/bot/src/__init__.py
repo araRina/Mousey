@@ -29,4 +29,5 @@ from .converter import *
 from .emoji import *
 from .enums import LogType
 from .errors import BannedUserNotFound, VisibleCommandError
+from .events import *
 from .plugin import Plugin

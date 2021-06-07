@@ -24,6 +24,7 @@ from discord.ext import commands
 from ... import (
     HTTPException,
     LogType,
+    MemberRoleChangeEvent,
     NotFound,
     Plugin,
     VisibleCommandError,
@@ -77,13 +78,14 @@ class Roles(Plugin):
         await self._ensure_no_privileged_permissions(group)
 
         if group not in ctx.author.roles:
-            events = self.mousey.get_cog('Events')
-            events.ignore(ctx.guild, 'role_add', ctx.author, group)
-
             reason = 'Self-assigned role'
+            event = MemberRoleChangeEvent(ctx.author, group, ctx.me, reason)
+
+            events = self.mousey.get_cog('Events')
+            events.ignore(ctx.guild, 'mouse_role_add', event)
 
             await ctx.author.add_roles(group, reason=reason)
-            self.mousey.dispatch('mouse_role_add', ctx.author, group, ctx.me, reason)
+            self.mousey.dispatch('mouse_role_add', event)
 
         await ctx.send(f'You\'ve been added to the `{code_safe(group)}` group role.')
 
@@ -103,13 +105,14 @@ class Roles(Plugin):
         await self._ensure_no_privileged_permissions(group)
 
         if group in ctx.author.roles:
-            events = self.mousey.get_cog('Events')
-            events.ignore(ctx.guild, 'role_remove', ctx.author, group)
-
             reason = 'Self-assigned role'
+            event = MemberRoleChangeEvent(ctx.author, group, ctx.me, reason)
+
+            events = self.mousey.get_cog('Events')
+            events.ignore(ctx.guild, 'mouse_role_remove', event)
 
             await ctx.author.remove_roles(group, reason=reason)
-            self.mousey.dispatch('mouse_role_remove', ctx.author, group, ctx.me, reason)
+            self.mousey.dispatch('mouse_role_remove', event)
 
         await ctx.send(f'You\'ve been removed from the `{code_safe(group)}` group role.')
 
@@ -158,7 +161,7 @@ class Roles(Plugin):
             suffix=f'\nUse `{prefix}{join}` and `{prefix}{leave}` to manage roles',
         )
 
-        groups = []
+        groups = {}
 
         for data in resp:
             role = ctx.guild.get_role(data['role_id'])
@@ -171,12 +174,11 @@ class Roles(Plugin):
             else:
                 description = ' - ' + data['description']
 
-            groups.append(role.mention + description)
+            groups[role.name] = role.mention + description
 
-        groups.sort(key=str.lower)
-
-        for group in groups:
-            paginator.add_line(group)
+        # Display groups in alphanumerical order
+        for name, description in sorted(groups.items(), key=lambda item: item[0].lower()):
+            paginator.add_line(description)
 
         interface = PaginatorInterface(self.mousey, paginator, owner=ctx.author, timeout=600)
 

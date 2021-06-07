@@ -40,8 +40,6 @@ log = logging.getLogger(__name__)
 GUILD_FEED = 298542293135392768
 ANNOUNCEMENTS = 445054928679993355
 
-REPOSITORY = 'https://github.com/LostLuma/Mousey'
-
 
 def json_float(value):
     # json.loads refuses to load nan or inf
@@ -61,8 +59,10 @@ def is_special(guild):
 def is_old_application(client_id):
     """bool: Whether an application may have a bot with a different user ID."""
 
-    date = datetime.datetime(2016, 8, 1)
-    return discord.utils.snowflake_time(client_id) < date
+    created_at = discord.utils.snowflake_time(client_id)
+    changed_at = datetime.datetime(2016, 8, 1, tzinfo=datetime.timezone.utc)
+
+    return created_at < changed_at
 
 
 def oauth_url(client_id, guild=None, permissions=None, scopes=None):
@@ -92,18 +92,7 @@ class About(Plugin):
     def cog_unload(self):
         self.update_status.cancel()
 
-    @command(aliases=['github'])
-    @bot_has_permissions(send_messages=True)
-    async def source(self, ctx):
-        """
-        Displays a link to my source code on GitHub.
-
-        Example: `{prefix}source`
-        """
-
-        await ctx.send(f'You can find my source code here: <{REPOSITORY}>')
-
-    @command(aliases=['hello'])
+    @command(aliases=['github', 'hello', 'source'])
     @bot_has_permissions(send_messages=True)
     async def about(self, ctx):
         """
@@ -113,8 +102,8 @@ class About(Plugin):
         """
 
         await ctx.send(
-            f'Mousey provides moderation and utility features for your Discord servers.\n'
-            f'The project is open-source and is being actively developed on GitHub: <{REPOSITORY}>'
+            'Mousey provides moderation and utility features for your Discord servers.\n\n'
+            'The project is open-source and is being actively developed on GitHub: <https://github.com/LostLuma/Mousey>'
         )
 
     @command()
@@ -249,21 +238,24 @@ class About(Plugin):
         await ctx.send('\\*squeak\\*')
 
     @Plugin.listener()
-    async def on_mouse_guild_join(self, guild):
-        log.info(f'Joined guild {guild!r}.')
+    async def on_mouse_guild_join(self, event):
+        log.info(f'Joined guild {event.guild!r}.')
 
-        bots = sum(x.bot for x in guild.members)
-        emoji = '\N{LARGE PURPLE CIRCLE}' if is_special(guild) else '\N{LARGE BLUE CIRCLE}'
+        bots = sum(x.bot for x in event.guild.members)
+        emoji = '\N{LARGE PURPLE CIRCLE}' if is_special(event.guild) else '\N{LARGE BLUE CIRCLE}'
 
-        await self._log_guild_change(
+        msg = (
+            f'{emoji} {describe(event.guild)} - '
             # As there are always at least two members we don't need to use Plural here
-            f'{emoji} {describe(guild)} - {guild.member_count} members - {Plural(bots):bot} - {describe(guild.owner)}'
+            f'{event.guild.member_count} members - {Plural(bots):bot} - {describe(event.guild.owner)}'
         )
 
+        await self._log_guild_change(msg)
+
     @Plugin.listener()
-    async def on_mouse_guild_remove(self, guild):
-        log.info(f'Left guild {guild!r}.')
-        await self._log_guild_change(f'\N{LARGE RED CIRCLE} {describe(guild)}')
+    async def on_mouse_guild_remove(self, event):
+        log.info(f'Left guild {event.guild!r}.')
+        await self._log_guild_change(f'\N{LARGE RED CIRCLE} {describe(event.guild)}')
 
     async def _log_guild_change(self, content):
         for transform in (simple_link_escape, discord.utils.escape_markdown):

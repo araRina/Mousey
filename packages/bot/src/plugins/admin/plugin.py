@@ -24,7 +24,7 @@ import datetime
 import discord
 from discord.ext import commands
 
-from ... import Plugin, bot_has_permissions, group
+from ... import InfractionEvent, Plugin, bot_has_permissions, group
 from ...utils import create_task
 from .converter import PruneDays
 from .enums import PruneStrategy
@@ -69,7 +69,7 @@ class Admin(Plugin):
     def cog_check(self, ctx):
         return ctx.author.guild_permissions.administrator
 
-    @group(default_greedy=True)
+    @group(greedy_require_arg=False)
     @bot_has_permissions(add_reactions=True, kick_members=True, send_messages=True)
     async def prune(self, ctx, roles: commands.Greedy[discord.Role], days: PruneDays):
         """
@@ -88,7 +88,7 @@ class Admin(Plugin):
 
         await self._prune_command(ctx, PruneStrategy.status, roles, days)
 
-    @prune.command('local', default_greedy=True)
+    @prune.command('local', greedy_require_arg=False)
     @bot_has_permissions(add_reactions=True, kick_members=True, send_messages=True)
     async def prune_local(self, ctx, roles: commands.Greedy[discord.Role], days: PruneDays):
         """
@@ -165,19 +165,22 @@ class Admin(Plugin):
             await ctx.send('Successfully cancelled prune.')
             return
 
+        me = ctx.guild.me
         guild = ctx.guild
+
         events = self.mousey.get_cog('Events')
+        reason = f'Prune initiated by {ctx.author}'
 
         for member, status in zip(members, statuses):
             if check(status):
-                reason = f'Prune initiated by {ctx.author}'
-                events.ignore(guild, 'member_kick', guild, member)
+                event = InfractionEvent(guild, member, me, reason)
+                events.ignore(guild, 'mouse_member_kick', event)
 
                 try:
                     await member.kick(reason=reason)
                 except discord.HTTPException:
                     pass
                 else:
-                    self.mousey.dispatch('mouse_member_kick', guild, member, guild.me, reason)
+                    self.mousey.dispatch('mouse_member_kick', event)
 
         await ctx.send(f'Successfully pruned `{count}` members.')

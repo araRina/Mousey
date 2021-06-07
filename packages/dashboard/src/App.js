@@ -1,10 +1,12 @@
-import React, { lazy, Suspense } from "react";
-import { BrowserRouter, Switch, Route } from "react-router-dom";
+import React, { Suspense } from "react";
+import { BrowserRouter, Route, Switch } from "react-router-dom";
+
+import { LoadingErrorBoundary, retryingLazy } from "./utils";
 
 import "./App.css";
 import "./colors.css";
 
-const Archive = lazy(() => import("./Archive"));
+const Archive = retryingLazy(() => import("./Archive"));
 
 function Loading() {
   return <div className="status">Loading website ...</div>;
@@ -17,16 +19,18 @@ function NotFound() {
 export default function App() {
   return (
     <BrowserRouter>
-      <Suspense fallback={<Loading />}>
-        <Switch>
-          <Route path="/archives/:id">
-            <Archive />
-          </Route>
-          <Route path="*">
-            <NotFound />
-          </Route>
-        </Switch>
-      </Suspense>
+      <LoadingErrorBoundary>
+        <Suspense fallback={<Loading />}>
+          <Switch>
+            <Route path="/archives/:id">
+              <Archive />
+            </Route>
+            <Route path="*">
+              <NotFound />
+            </Route>
+          </Switch>
+        </Suspense>
+      </LoadingErrorBoundary>
     </BrowserRouter>
   );
 }

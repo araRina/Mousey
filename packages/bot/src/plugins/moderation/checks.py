@@ -18,10 +18,19 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
-from .asyncio import create_task
-from .formatting import Plural, code_safe, describe, describe_user, user_name
-from .helpers import create_paste, has_membership_screening, populate_methods, serialize_user
-from .logging import setup_logging
-from .paginator import PaginatorInterface, close_interface_context
-from .sql import PGSQL_ARG_LIMIT, multirow_insert
-from .time import TimeConverter, human_delta
+from discord.ext import commands
+
+from ... import VisibleCommandError
+
+
+def guild_has_mute_role():
+    async def predicate(ctx):
+        moderation = ctx.bot.get_cog('Moderation')
+        role = await moderation.get_mute_role(ctx.guild)
+
+        if role is not None:
+            return True
+
+        raise VisibleCommandError('A mute role is required in order to execute this command.')
+
+    return commands.check(predicate)

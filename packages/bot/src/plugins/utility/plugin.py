@@ -27,7 +27,7 @@ import discord
 from discord.ext import commands
 
 from ... import Plugin, VisibleCommandError, bot_has_guild_permissions, bot_has_permissions, command, emoji, group
-from ...utils import Plural, has_any_permission, has_membership_screening, human_delta
+from ...utils import Plural, has_membership_screening, human_delta
 from .converter import MentionableRole, info_category
 
 
@@ -64,8 +64,8 @@ class Utility(Plugin):
 
         user = user or ctx.author
 
-        avatar_url = str(user.avatar_url_as(static_format='png'))
-        avatar_ext = 'gif' if user.is_avatar_animated() else 'png'
+        avatar_url = user.avatar.with_static_format('png').url
+        avatar_ext = 'gif' if user.avatar.is_animated() else 'png'
 
         # Send as attachment if possible, as URLs expire
         file = None
@@ -95,7 +95,7 @@ class Utility(Plugin):
         """
 
         user = user or ctx.author
-        now = datetime.datetime.utcnow()
+        now = discord.utils.utcnow()
 
         await ctx.send(
             f'{user} joined this server `{human_delta(now - user.joined_at)}` '
@@ -119,7 +119,7 @@ class Utility(Plugin):
         status = await self.mousey.get_cog('Tracking').get_last_status(user)
 
         if status.status is None:
-            presence = f'was never seen online'
+            presence = f'has not been seen online'
         else:
             prefix = 'on ' if user.status is discord.Status.dnd else ''
             presence = f'has been {prefix}{user.status} for `{human_delta(now - status.status)}`'
@@ -130,7 +130,7 @@ class Utility(Plugin):
             seen = f', they were last seen `{human_delta(now - status.seen)}` ago'
 
         if status.spoke is None:
-            spoke = ', and was never seen speaking'
+            spoke = ', and has not been seen speaking'
         else:
             spoke = f', and last spoke `{human_delta(now - status.spoke)}` ago'
 
@@ -144,7 +144,9 @@ class Utility(Plugin):
         pass  # TODO: Create decorator to share cooldowns properly
 
     @mention.command('role')
-    @has_any_permission(manage_roles=True, mention_everyone=True)
+    @commands.check_any(
+        commands.has_permissions(mention_everyone=True), commands.has_guild_permissions(manage_roles=True)
+    )
     @bot_has_permissions(send_messages=True)
     @bot_has_guild_permissions(manage_roles=True)
     async def mention_role(self, ctx, roles: commands.Greedy[MentionableRole], *, message: str = None):
@@ -243,10 +245,17 @@ class Utility(Plugin):
         guild = ctx.guild
         # Some properties are only set fetched with counts:
         # approximate_member_count, approximate_presence_count, max_members
-        fetched = await self.mousey.fetch_guild(ctx.guild.id)
+
+        # TODO: Use proper fetch_guild call once attributes are implemented
+        params = {'with_counts': 1}
+        route = discord.http.Route('GET', '/guilds/{guild_id}', guild_id=ctx.guild.id)
+
+        fetched = await self.mousey.http.request(route, params=params)
 
         embed = discord.Embed()
-        embed.set_thumbnail(url=guild.icon_url)
+
+        if guild.icon is not None:
+            embed.set_thumbnail(url=guild.icon.url)
 
         embed.description = guild.description
         embed.title = f'Server Information - {guild.name}'
@@ -336,8 +345,8 @@ class Utility(Plugin):
         idle = f'{emoji.IDLE} {presences[discord.Status.idle]:,}'
         dnd = f'{emoji.DND} {presences[discord.Status.dnd]:,}'
 
-        active = fetched.approximate_presence_count
-        inactive = guild.member_count - fetched.approximate_presence_count
+        active = fetched['approximate_presence_count']
+        inactive = guild.member_count - fetched['approximate_presence_count']
 
         role_count = len(guild.roles)
 
@@ -367,7 +376,7 @@ class Utility(Plugin):
             name='Counts',
             value=inspect.cleandoc(
                 f"""
-                **Members:** {guild.member_count:,} ({Plural(bot_count):bot}{pending}) / {fetched.max_members:,}
+                **Members:** {guild.member_count:,} ({Plural(bot_count):bot}{pending}) / {fetched['max_members']:,}
 
                 **Statuses:** {online} {idle} {dnd}
                 **Presences:** {active:,} active; {inactive:,} inactive
