@@ -28,18 +28,18 @@ from starlette.routing import Router
 from ..auth import is_authorized
 from ..config import SHARD_COUNT
 from ..permissions import has_permissions
-from ..utils import ensure_user, generate_snowflake
+from ..utils import build_update_query, ensure_user, generate_snowflake
 
 
 router = Router()
 
 
-@router.route('/guilds/{id:int}/tags', methods=['POST'])
+@router.route('/guilds/{guild_id:int}/tags', methods=['POST'])
 @is_authorized
 @has_permissions(administrator=True)
-async def post_guilds_id_tags(request):
+async def post_guilds_guild_id_tags(request):
     data = await request.json()
-    guild_id = request.path_params['id']
+    guild_id = request.path_params['guild_id']
 
     tag_id = generate_snowflake()
 
@@ -67,3 +67,110 @@ async def post_guilds_id_tags(request):
             raise HTTPException(400, 'Duplicate tag name provided.')
 
     return JSONResponse({'id': tag_id})
+
+
+@router.route('/guilds/{guild_id:int}/tags', ['GET'])
+@is_authorized
+@has_permissions(administrator=True)
+async def get_guilds_guild_id_tags(request):
+    guild_id = request.path_params['guild_id']
+
+    name = request.query_params.get('name')
+    member_id = request.query_params.get('member_id')
+
+    if name is not None:
+        name = f'%{name}%'.lower()
+
+    if member_id is not None:
+        try:
+            member_id = int(member_id)
+        except ValueError:
+            raise HTTPException(400, 'Invalid "member_id" query param.')
+
+    main_query = 'SELECT id, user_id, name, content FROM tags WHERE guild_id = ${}'
+    name_query = "AND LOWER(name) LIKE ${}" if name else ''
+    member_query = 'AND user_id = ${}' if member_id else ''
+
+    full_query = f'{main_query} {name_query} {member_query}'
+
+    args = tuple(filter(bool, (guild_id, name, member_id)))
+
+    async with request.app.db.acquire() as conn:
+        records = await conn.fetch(full_query.format(1, 2, 3), *args)
+
+    if not records:
+        raise HTTPException(400, 'None found')
+
+    return JSONResponse(list(map(dict, records)))
+
+
+@router.route('/guilds/{guild_id:int}/tags/{id:int}', methods=['PATCH'])
+@is_authorized
+@has_permissions(administrator=True)
+async def patch_guilds_guild_id_tags_id(request):
+    data = await request.json()
+
+    tag_id = request.path_params['id']
+    guild_id = request.path_params['guild_id']
+
+    user = data.get('user')
+
+    name = data.get('name')
+    content = data.get('content')
+
+    if user is None and name is None and content is None:
+        raise HTTPException(400, 'Requires at least one of "user", "name" or "content" JSON field.')
+
+    names = []
+    updates = []
+
+    if user is not None:
+        names.append('user_id')
+        updates.append(user['id'])
+
+    if name is not None:
+        names.append('name')
+        updates.append(name)
+
+    if content is not None:
+        names.append('content')
+        updates.append(content)
+
+    query, idx = build_update_query(names)
+
+    async with request.app.db.acquire() as conn:
+        if user is not None:
+            ensure_user(conn, user)
+
+        record = await conn.fetchrow(
+            f"""
+            UPDATE tags
+            SET {query}
+            WHERE guild_id = ${idx} AND id = ${idx + 1}
+            RETURNING id, guild_id, user_id, name, content
+            """,
+            *updates,
+            guild_id,
+            tag_id,
+        )
+
+    if record is not None:
+        return JSONResponse(dict(record))
+
+    raise HTTPException(404, 'Tag not found.')
+
+
+@router.route('/guilds/{guild_id:int}/tags/{id:int}', methods=['DELETE'])
+@is_authorized
+@has_permissions(administrator=True)
+async def delete_guilds_guild_id_tags_id(request):
+    guild_id = request.path_params['guild_id']
+    tag_id = request.path_params['id']
+
+    async with request.app.db.acquire() as conn:
+        status = await conn.execute('DELETE FROM tags WHERE guild_id = $1 AND id = $2', guild_id, tag_id)
+
+    if int(status.split()[1]):
+        return JSONResponse({})
+
+    raise HTTPException(404, 'Tag not found.')
