@@ -21,4 +21,4 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 from .crypto import decrypt_json, encrypt_json
 from .helpers import ensure_user, find_request_parameter, parse_expires_at
 from .snowflake import generate_snowflake
-from .sql import build_update_query
+from .sql import build_search_query, build_update_query

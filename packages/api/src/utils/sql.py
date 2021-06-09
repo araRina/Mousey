@@ -30,3 +30,16 @@ def build_update_query(parameters):
         idx += 1
 
     return ', '.join(updates), idx
+
+
+def build_search_query(parameters):
+    """Creates the inner SELECT statement for an arbitrary amount of parameters."""
+
+    idx = 1
+    searches = []
+
+    for name in parameters:
+        searches.append(f'{name} ${idx}')
+        idx += 1
+
+    return ' AND '.join(searches), idx

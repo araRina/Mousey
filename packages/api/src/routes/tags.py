@@ -28,7 +28,7 @@ from starlette.routing import Router
 from ..auth import is_authorized
 from ..config import SHARD_COUNT
 from ..permissions import has_permissions
-from ..utils import build_update_query, ensure_user, generate_snowflake
+from ..utils import build_search_query, build_update_query, ensure_user, generate_snowflake
 
 
 router = Router()
@@ -76,27 +76,28 @@ async def get_guilds_guild_id_tags(request):
     guild_id = request.path_params['guild_id']
 
     name = request.query_params.get('name')
-    member_id = request.query_params.get('member_id')
+    user_id = request.query_params.get('user_id')
+
+    searches = ['guild_id = ']
 
     if name is not None:
         name = f'%{name}%'.lower()
 
-    if member_id is not None:
+        searches.append('LOWER(name) LIKE ')
+
+    if user_id is not None:
         try:
-            member_id = int(member_id)
+            user_id = int(user_id)
         except ValueError:
-            raise HTTPException(400, 'Invalid "member_id" query param.')
+            raise HTTPException(400, 'Invalid "user_id" query param.')
 
-    main_query = 'SELECT id, user_id, name, content FROM tags WHERE guild_id = ${}'
-    name_query = "AND LOWER(name) LIKE ${}" if name else ''
-    member_query = 'AND user_id = ${}' if member_id else ''
+        searches.append('user_id = ')
 
-    full_query = f'{main_query} {name_query} {member_query}'
-
-    args = tuple(filter(bool, (guild_id, name, member_id)))
+    query, idx = build_search_query(searches)
+    args = tuple(filter(bool, (guild_id, name, user_id)))
 
     async with request.app.db.acquire() as conn:
-        records = await conn.fetch(full_query.format(1, 2, 3), *args)
+        records = await conn.fetch(f'SELECT id, user_id, name, content FROM tags WHERE {query}', *args)
 
     if not records:
         raise HTTPException(400, 'None found')
