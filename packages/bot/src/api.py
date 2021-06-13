@@ -191,6 +191,31 @@ class APIClient:
         data = {'shard_id': shard_id, 'status': status}
         return await self.request('POST', '/status', json=data)
 
+    # Tags
+
+    async def create_tag(self, guild_id, data):
+        return await self.request('POST', f'/guilds/{guild_id}/tags', json=data)
+
+    async def get_tags(self, guild_id, name=None, query=None):
+        data = {}
+
+        if name is not None:
+            data['name'] = name
+
+        if query is not None:
+            data['query'] = query
+
+        return await self.request('GET', f'/guilds/{guild_id}/tags', params=data)
+
+    async def get_member_tags(self, guild_id, member_id):
+        return await self.request('GET', f'/guilds/{guild_id}/members/{member_id}/tags')
+
+    async def update_tag(self, guild_id, tag_id, data):
+        return await self.request('PATCH', f'/guilds/{guild_id}/tags/{tag_id}', json=data)
+
+    async def delete_tag(self, guild_id, tag_id):
+        return await self.request('DELETE', f'/guilds/{guild_id}/tags/{tag_id}')
+
     # Users
 
     async def update_user(self, data):
