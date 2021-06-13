@@ -108,6 +108,7 @@ async def get_guilds_guild_id_tags(request):
 @has_permissions(administrator=True)
 async def get_guilds_guild_id_members_member_id_tags(request):
     guild_id = request.path_params['guild_id']
+
     try:
         user_id = int(request.path_params['user_id'])
     except ValueError:
@@ -115,7 +116,7 @@ async def get_guilds_guild_id_members_member_id_tags(request):
 
     async with request.app.db.acquire() as conn:
         records = await conn.fetch(
-            f"""
+            """
             SELECT id, user_id, name, content
             FROM tags
             WHERE guild_id = $1 AND user_id = $2
