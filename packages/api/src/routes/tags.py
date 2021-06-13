@@ -76,31 +76,56 @@ async def get_guilds_guild_id_tags(request):
     guild_id = request.path_params['guild_id']
 
     name = request.query_params.get('name')
-    user_id = request.query_params.get('user_id')
+    search_query = request.query_params.get('query')
 
     searches = ['guild_id = ']
 
-    if name is not None:
-        name = f'%{name}%'.lower()
+    if name and search_query:
+        raise HTTPException(400, '"name" and "query" query params are mutually exclusive.')
 
+    if name is not None:
+        name = name.lower()
+        searches.append('LOWER(name) = ')
+
+    if search_query is not None:
+        search_query = f'%{search_query}%'.lower()
         searches.append('LOWER(name) LIKE ')
 
-    if user_id is not None:
-        try:
-            user_id = int(user_id)
-        except ValueError:
-            raise HTTPException(400, 'Invalid "user_id" query param.')
-
-        searches.append('user_id = ')
-
     query, idx = build_search_query(searches)
-    args = tuple(filter(bool, (guild_id, name, user_id)))
+    args = tuple(filter(bool, (guild_id, name, search_query)))
 
     async with request.app.db.acquire() as conn:
         records = await conn.fetch(f'SELECT id, user_id, name, content FROM tags WHERE {query}', *args)
 
     if not records:
-        raise HTTPException(400, 'None found')
+        raise HTTPException(400, 'None found.')
+
+    return JSONResponse(list(map(dict, records)))
+
+
+@router.route('/guilds/{guild_id:int}/tags/members/{member_id}', ['GET'])
+@is_authorized
+@has_permissions(administrator=True)
+async def get_guilds_guild_id_members_member_id_tags(request):
+    guild_id = request.path_params['guild_id']
+    try:
+        user_id = int(request.path_params['user_id'])
+    except ValueError:
+        raise HTTPException(400, 'Invalid "user_id" query param.')
+
+    async with request.app.db.acquire() as conn:
+        records = await conn.fetch(
+            f"""
+            SELECT id, user_id, name, content
+            FROM tags
+            WHERE guild_id = $1 AND user_id = $2
+            """,
+            guild_id,
+            user_id,
+        )
+
+    if not records:
+        raise HTTPException(400, 'None found.')
 
     return JSONResponse(list(map(dict, records)))
 
