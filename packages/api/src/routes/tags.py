@@ -98,7 +98,7 @@ async def get_guilds_guild_id_tags(request):
         records = await conn.fetch(f'SELECT id, user_id, name, content FROM tags WHERE {query}', *args)
 
     if not records:
-        raise HTTPException(400, 'None found.')
+        raise HTTPException(404, 'None found.')
 
     return JSONResponse(list(map(dict, records)))
 
@@ -126,7 +126,7 @@ async def get_guilds_guild_id_members_member_id_tags(request):
         )
 
     if not records:
-        raise HTTPException(400, 'None found.')
+        raise HTTPException(404, 'None found.')
 
     return JSONResponse(list(map(dict, records)))
 
