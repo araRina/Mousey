@@ -103,16 +103,12 @@ async def get_guilds_guild_id_tags(request):
     return JSONResponse(list(map(dict, records)))
 
 
-@router.route('/guilds/{guild_id:int}/tags/members/{member_id}', ['GET'])
+@router.route('/guilds/{guild_id:int}/members/{member_id:int}/tags', ['GET'])
 @is_authorized
 @has_permissions(administrator=True)
 async def get_guilds_guild_id_members_member_id_tags(request):
     guild_id = request.path_params['guild_id']
-
-    try:
-        user_id = int(request.path_params['user_id'])
-    except ValueError:
-        raise HTTPException(400, 'Invalid "user_id" query param.')
+    user_id = request.path_params['member_id']
 
     async with request.app.db.acquire() as conn:
         records = await conn.fetch(
