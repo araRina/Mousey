@@ -50,7 +50,12 @@ class LogType(discord.Enum):
 
     ROLE_CREATE = 1 << 14
     ROLE_UPDATE = 1 << 15
+    ROLE_PERMISSIONS_UPDATE = 1 << 28
     ROLE_DELETE = 1 << 16
+
+    EMOJI_CREATE = 1 << 29
+    EMOJI_UPDATE = 1 << 30
+    EMOJI_DELETE = 1 << 31
 
     CHANNEL_CREATE = 1 << 17
     CHANNEL_UPDATE = 1 << 18

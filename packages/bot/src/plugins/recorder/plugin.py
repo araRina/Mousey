@@ -27,7 +27,7 @@ import discord
 
 from ... import LogType, Plugin
 from ...utils import Plural, code_safe, create_paste, describe, describe_user, human_delta, user_name
-from .formatting import escape_formatting, indent_multiline, join_parts
+from .formatting import describe_emoji, escape_formatting, indent_multiline, join_parts, join_with_code
 
 
 log = logging.getLogger(__name__)
@@ -89,7 +89,9 @@ class Recorder(Plugin):
         now = discord.utils.utcnow()
 
         seconds = (now - event.member.created_at).total_seconds()
-        parts.append(f'Created `{human_delta(seconds)}` ago')
+
+        is_new = '\N{SQUARED NEW}' if seconds < 86400 * 7 else ''
+        parts.append(f'Created `{human_delta(seconds)}` ago {is_new}')
 
         if event.member.bot:
             verb = 'added'
@@ -131,7 +133,7 @@ class Recorder(Plugin):
         count = len(member.roles)
 
         if count > 1:  # Members always have the @everyone role
-            roles = ', '.join(f'`{code_safe(x)}`' for x in member.roles[10:0:-1])
+            roles = join_with_code(member.roles[10:0:-1])
             too_many = ', \N{HORIZONTAL ELLIPSIS}' if len(member.roles) > 11 else ''
 
             parts.append(f'Roles: {roles}{too_many}')
@@ -309,7 +311,7 @@ class Recorder(Plugin):
             parts.append(role_tag_info(event.role))
 
         if event.role.permissions.value:
-            parts.append(f'Permissions: ' + ', '.join(f'`{x}`' for x in enabled_permissions(event.role.permissions)))
+            parts.append(f'Permissions: ' + join_with_code(enabled_permissions(event.role.permissions)))
 
         parts.extend(moderator_info(event))
         msg = f'\N{OPEN BOOK} `{describe(event.role)}` created{join_parts(parts)}'
@@ -317,11 +319,22 @@ class Recorder(Plugin):
         await self.log(event.role.guild, LogType.ROLE_DELETE, msg)
 
     @Plugin.listener()
+    async def on_mouse_role_color_update(self, event):
+        parts = moderator_info(event)
+
+        msg = (
+            f'\N{LOWER LEFT PAINTBRUSH}{VS16} `{describe(event.role)}` color updated from '
+            f'`#{hex(event.before.value)[2:]}` to `#{hex(event.after.value)[2:]}`{join_parts(parts)}'
+        )
+
+        await self.log(event.role.guild, LogType.ROLE_UPDATE, msg)
+
+    @Plugin.listener()
     async def on_mouse_role_name_update(self, event):
         parts = moderator_info(event)
 
         msg = (
-            f'\N{BOOKS} `{describe(event.role)}` renamed from '
+            f'\N{BOOKS} `{describe(event.role)}` was renamed from '
             f'`{code_safe(event.before)}` to `{code_safe(event.after)}`{join_parts(parts)}'
         )
 
@@ -348,14 +361,14 @@ class Recorder(Plugin):
         parts = []
 
         if added.value:
-            parts.append(f'Added: ' + ', '.join(f'`{x}`' for x in enabled_permissions(added)))
+            parts.append(f'Added: ' + join_with_code(enabled_permissions(added)))
         if removed.value:
-            parts.append(f'Removed: ' + ', '.join(f'`{x}`' for x in enabled_permissions(removed)))
+            parts.append(f'Removed: ' + join_with_code(enabled_permissions(removed)))
 
         parts.extend(moderator_info(event))
 
         msg = f'\N{BOOKS} `{describe(event.role)}` permissions updated{join_parts(parts)}'
-        await self.log(event.role.guild, LogType.ROLE_UPDATE, msg)
+        await self.log(event.role.guild, LogType.ROLE_PERMISSIONS_UPDATE, msg)
 
     @Plugin.listener()
     async def on_mouse_role_delete(self, event):
@@ -369,6 +382,34 @@ class Recorder(Plugin):
         await self.log(event.role.guild, LogType.ROLE_DELETE, msg)
 
     @Plugin.listener()
+    async def on_mouse_emoji_create(self, event):
+        parts = moderator_info(event)
+        parts.append(f'Emoji URL: <{event.emoji.url}>')
+
+        msg = f'\N{ARTIST PALETTE} `{describe_emoji(event.emoji)}` was uploaded{join_parts(parts)}'
+        await self.log(event.emoji.guild, LogType.EMOJI_CREATE, msg)
+
+    @Plugin.listener()
+    async def on_mouse_emoji_name_update(self, event):
+        parts = moderator_info(event)
+        parts.append(f'Emoji URL: <{event.emoji.url}>')
+
+        msg = (
+            f'\N{BOOKS} `{describe_emoji(event.emoji)}` was renamed from '
+            f'`{code_safe(event.before)}` to `{code_safe(event.after)}`{join_parts(parts)}'
+        )
+
+        await self.log(event.emoji.guild, LogType.EMOJI_UPDATE, msg)
+
+    @Plugin.listener()
+    async def on_mouse_emoji_delete(self, event):
+        parts = moderator_info(event)
+        parts.append(f'Emoji URL: <{event.emoji.url}>')
+
+        msg = f'\N{WASTEBASKET}{VS16} `{describe_emoji(event.emoji)}` was deleted{join_parts(parts)}'
+        await self.log(event.emoji.guild, LogType.EMOJI_DELETE, msg)
+
+    @Plugin.listener()
     async def on_mouse_channel_create(self, event):
         parts = moderator_info(event)
         msg = f'\N{PAGE FACING UP} `#{describe(event.channel)}` created{join_parts(parts)}'
@@ -380,7 +421,7 @@ class Recorder(Plugin):
         parts = moderator_info(event)
 
         msg = (
-            f'\N{PAPERCLIP} `#{describe(event.channel)}` renamed from '
+            f'\N{PAPERCLIP} `#{describe(event.channel)}` was renamed from '
             f'`{code_safe(event.before)}` to `{code_safe(event.after)}`{join_parts(parts)}'
         )
 

@@ -26,6 +26,8 @@ from ... import Plugin
 from ...events import (
     ChannelChangeEvent,
     ChannelUpdateEvent,
+    EmojiChangeEvent,
+    EmojiUpdateEvent,
     InfractionEvent,
     MemberJoinEvent,
     MemberRoleChangeEvent,
@@ -186,7 +188,7 @@ class Events(Plugin):
 
     @Plugin.listener()
     async def on_guild_role_update(self, before, after):
-        attrs = ('mentionable', 'name', 'permissions')
+        attrs = ('color', 'mentionable', 'name', 'permissions')
         self._compare_and_dispatch(RoleUpdateEvent, 'role', discord.AuditLogAction.role_update, before, after, attrs)
 
     @Plugin.listener()
@@ -199,6 +201,38 @@ class Events(Plugin):
             await self._fetch_and_dispatch(
                 role.guild, 'mouse_role_delete', event, discord.AuditLogAction.role_delete, target=role
             )
+
+    @Plugin.listener()
+    async def on_guild_emojis_update(self, guild, before, after):
+        old = {emoji.id: emoji for emoji in before}
+
+        for emoji in after:
+            before = old.get(emoji.id)
+
+            if before is None:
+                event = EmojiChangeEvent(emoji)
+                event_name = 'mouse_emoji_create'
+
+                action = discord.AuditLogAction.emoji_create
+                await self._fetch_and_dispatch(guild, event_name, event, action, target=emoji)
+            elif before.name != emoji.name:
+                event = EmojiUpdateEvent(emoji, before.name, emoji.name)
+                event_name = 'mouse_emoji_name_update'
+
+                action = discord.AuditLogAction.emoji_update
+                await self._fetch_and_dispatch(guild, event_name, event, action, target=emoji)
+
+            try:
+                del old[emoji.id]
+            except KeyError:
+                pass
+
+        for emoji in old.values():
+            event = EmojiChangeEvent(emoji)
+            event_name = 'mouse_emoji_delete'
+
+            action = discord.AuditLogAction.emoji_delete
+            await self._fetch_and_dispatch(guild, event_name, event, action, target=emoji)
 
     @Plugin.listener()
     async def on_guild_channel_create(self, channel):
