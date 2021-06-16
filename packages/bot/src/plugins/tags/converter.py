@@ -22,13 +22,6 @@ from discord.ext import commands
 from ... import NotFound
 
 
-def tag_description(argument):
-    if len(argument) <= 250:
-        return argument
-
-    raise commands.BadArgument('Description must be 250 or fewer characters.')
-
-
 class Tag:
     def __init__(self, name, content, owner_id, tag_id):
         self.name = name
