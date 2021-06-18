@@ -34,32 +34,59 @@ def shorten_content(content):
 
 
 class Tags(Plugin):
-    @group()
+    @group(usage='<tag name>')
     async def tag(self, ctx, tag: Tag):
-        await ctx.send(f':information_source: {tag.content}')
+        """
+        View an existing tag on a server.
+
+        Example: `{prefix}tag "rule 1"`
+        \u200b
+        """
+
+        await ctx.send(f'\N{INFORMATION SOURCE} {tag.content}')
 
     @tag.command('create')
     async def tag_create(self, ctx, name: tag_name, *, content: tag_content):
+        """
+        Make a new tag.
+
+        Name can be any string up to 100 characters in length, but must not already be taken on the current server.
+        Content can be any string up to 1998 characters in length.
+
+        Example: `{prefix}tag create "rule 1" Be nice to others.`
+        \u200b
+        """
+
         data = {'user': serialize_user(ctx.author), 'name': name, 'content': content}
         await self.mousey.api.create_tag(ctx.guild.id, data)
 
         await ctx.send('Tag successfully created!')
 
     @tag.command('list')
-    async def tag_list(self, ctx, tag_owner: discord.User = None):
+    async def tag_list(self, ctx, user: discord.User = None):
+        """
+        Lists all tags in the current server, or all the tags owned by a specified user.
+
+        User can be any user who owns a tag.
+
+        Example: `{prefix}tag list`
+        Example: `{prefix}tag list @Rina#5251`
+        \u200b
+        """
+
         try:
-            if tag_owner is None:
+            if user is None:
                 tags = await self.mousey.api.get_tags(ctx.guild.id)
             else:
-                tags = await self.mousey.api.get_member_tags(ctx.guild.id, tag_owner.id)
+                tags = await self.mousey.api.get_member_tags(ctx.guild.id, user.id)
         except NotFound:
-            if tag_owner is None:
+            if user is None:
                 await ctx.send('There are no tags in this server!')
             else:
                 await ctx.send('This user has not made any tags!')
         else:
             paginator = commands.Paginator(
-                max_size=1000, prefix=f"{tag_owner}'s tags\n" if tag_owner else 'Server tags', suffix=None
+                max_size=1000, prefix=f"{user}'s tags\n" if user else 'Server tags', suffix=None
             )
 
             for tag in tags:
@@ -70,8 +97,18 @@ class Tags(Plugin):
             await interface.send_to(ctx.channel)
             close_interface_context(ctx, interface)
 
-    @tag.command('delete')
+    @tag.command('delete', usage='<tag name>')
     async def tag_delete(self, ctx, tag: Tag):
+        """
+        Deletes a tag in the current server.
+        You can delete tags you own, or any tag if you have the Manage Messages permission.
+
+        Tag name is the name of an existing tag you want to delete.
+
+        `Example: {prefix}tag delete "rule 1"`
+        \u200b
+        """
+
         if tag.owner_id == ctx.author.id or ctx.author.guild_permissions.manage_messages:
             await self.mousey.api.delete_tag(ctx.guild.id, tag.id)
 
@@ -79,8 +116,19 @@ class Tags(Plugin):
         else:
             await ctx.send('You do not own this tag!')
 
-    @tag.command('rename')
+    @tag.command('rename', usage='<old name> <new name>')
     async def tag_rename(self, ctx, tag: Tag, new_name: tag_name):
+        """
+        Gives a tag in the current server a new name.
+        You can delete tags you own, or any tag if you have the Manage Messages permission.
+
+        Old name is the name of an existing tag.
+        New name can be any string up to 100 characters long, and must not already be taken.
+
+        `Example: {prefix}tag rename SnowyLuma LostLuma`
+        \u200b
+        """
+
         if tag.owner_id == ctx.author.id or ctx.author.guild_permissions.manage_messages:
             data = {'name': new_name}
             await self.mousey.api.update_tag(ctx.guild.id, tag.id, data)
@@ -89,8 +137,19 @@ class Tags(Plugin):
         else:
             await ctx.send('You do not own this tag!')
 
-    @tag.command('edit')
-    async def tag_edit(self, ctx, tag: Tag, new_content: tag_content):
+    @tag.command('edit', usage='<tag name> <new content>')
+    async def tag_edit(self, ctx, tag: Tag, *, new_content: tag_content):
+        """
+        Edits a tag's content given it exists in the current server.
+        You can edit tags you own, or any tag if you have the Manage Messages permission.
+
+        Tag name is the name of an existing tag.
+        New content can be any string up to 1998 characters long.
+
+        `Example: {prefix}tag edit "Planned events" No events are planned currently.`
+        \u200b
+        """
+
         if tag.owner_id == ctx.author.id or ctx.author.guild_permissions.manage_messages:
             data = {'content': new_content}
             await self.mousey.api.update_tag(ctx.guild.id, tag.id, data)
@@ -99,8 +158,19 @@ class Tags(Plugin):
         else:
             await ctx.send('You do not own this tag!')
 
-    @tag.command('transfer')
+    @tag.command('transfer', usage='<tag name> <new owner>')
     async def tag_transfer(self, ctx, tag: Tag, new_owner: discord.Member):
+        """
+        Transfers an existing tag in the server to a new owner.
+        You can transfers tags you own, or any tag if you have the Manage Messages permission.
+
+        Tag name is the name of an existing tag.
+        New owner is a reference to a member of the current server.
+
+        `Example: {prefix}tag transfer "rule 1" Rina#5251`
+        \u200b
+        """
+
         if tag.owner_id == ctx.author.id or ctx.author.guild_permissions.manage_messages:
             data = {'user': serialize_user(new_owner)}
             await self.mousey.api.update_tag(ctx.guild.id, tag.id, data)
