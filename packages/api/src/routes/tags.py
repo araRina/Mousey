@@ -56,7 +56,7 @@ async def post_guilds_guild_id_tags(request):
 
         try:
             await conn.execute(
-                'INSERT INTO tags (id, user_id, guild_id, name, content) VALUES ($1, $2, $3, $4, $5)',
+                'INSERT INTO tags (id, owner_id, guild_id, name, content) VALUES ($1, $2, $3, $4, $5)',
                 tag_id,
                 user['id'],
                 guild_id,
@@ -95,7 +95,7 @@ async def get_guilds_guild_id_tags(request):
     args = tuple(filter(bool, (guild_id, name, search_query)))
 
     async with request.app.db.acquire() as conn:
-        records = await conn.fetch(f'SELECT id, user_id, name, content FROM tags WHERE {query}', *args)
+        records = await conn.fetch(f'SELECT id, owner_id, name, content FROM tags WHERE {query}', *args)
 
     if not records:
         raise HTTPException(404, 'None found.')
@@ -108,17 +108,17 @@ async def get_guilds_guild_id_tags(request):
 @has_permissions(administrator=True)
 async def get_guilds_guild_id_members_member_id_tags(request):
     guild_id = request.path_params['guild_id']
-    user_id = request.path_params['member_id']
+    owner_id = request.path_params['member_id']
 
     async with request.app.db.acquire() as conn:
         records = await conn.fetch(
             """
-            SELECT id, user_id, name, content
+            SELECT id, owner_id, name, content
             FROM tags
-            WHERE guild_id = $1 AND user_id = $2
+            WHERE guild_id = $1 AND owner_id = $2
             """,
             guild_id,
-            user_id,
+            owner_id,
         )
 
     if not records:
@@ -148,7 +148,7 @@ async def patch_guilds_guild_id_tags_id(request):
     updates = []
 
     if user is not None:
-        names.append('user_id')
+        names.append('owner_id')
         updates.append(user['id'])
 
     if name is not None:
@@ -163,14 +163,14 @@ async def patch_guilds_guild_id_tags_id(request):
 
     async with request.app.db.acquire() as conn:
         if user is not None:
-            ensure_user(conn, user)
+            await ensure_user(conn, user)
 
         record = await conn.fetchrow(
             f"""
             UPDATE tags
             SET {query}
             WHERE guild_id = ${idx} AND id = ${idx + 1}
-            RETURNING id, guild_id, user_id, name, content
+            RETURNING id, guild_id, owner_id, name, content
             """,
             *updates,
             guild_id,

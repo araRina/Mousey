@@ -37,7 +37,7 @@ class Tag:
             raise commands.BadArgument(f'Tag "{argument}" not found.')
 
         found_tag = resp[0]
-        return cls(found_tag['name'], found_tag['content'], found_tag['user_id'], found_tag['id'])
+        return cls(found_tag['name'], found_tag['content'], found_tag['owner_id'], found_tag['id'])
 
 
 def tag_content(argument):
