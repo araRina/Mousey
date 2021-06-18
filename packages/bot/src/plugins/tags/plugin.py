@@ -29,6 +29,7 @@ from .converter import Tag, tag_content, tag_name
 def shorten_content(content):
     if len(content) > 30:
         content = f'{content[0:29]}...'
+
     return content
 
 
@@ -40,7 +41,6 @@ class Tags(Plugin):
     @tag.command('create')
     async def tag_create(self, ctx, name: tag_name, *, content: tag_content):
         data = {'user': serialize_user(ctx.author), 'name': name, 'content': content}
-
         await self.mousey.api.create_tag(ctx.guild.id, data)
 
         await ctx.send('Tag successfully created!')
@@ -63,7 +63,6 @@ class Tags(Plugin):
             )
 
             for tag in tags:
-
                 paginator.add_line(f'**{tag["name"]}**:\n{shorten_content(tag["content"])}')
 
             interface = PaginatorInterface(self.mousey, paginator, owner=ctx.author, timeout=600)
