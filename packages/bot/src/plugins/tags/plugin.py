@@ -48,9 +48,10 @@ class Tags(Plugin):
     @tag.command('create')
     async def tag_create(self, ctx, name: tag_name, *, content: tag_content):
         """
-        Make a new tag.
+        Make a new tag with the specified description.
 
-        Name can be any string up to 100 characters in length, but must not already be taken on the current server.
+        Name can be any string up to 100 characters in length.
+          Note: The name must not be taken by any other tags on the server.
         Content can be any string up to 1998 characters in length.
 
         Example: `{prefix}tag create "rule 1" Be nice to others.`
@@ -65,9 +66,10 @@ class Tags(Plugin):
     @tag.command('list')
     async def tag_list(self, ctx, user: discord.User = None):
         """
-        Lists all tags in the current server, or all the tags owned by a specified user.
+        View all tags in the current server.
+        You may provide a user to see all tags from them.
 
-        User can be any user who owns a tag.
+        User can be specified as a mention, ID, DiscordTag, or name.
 
         Example: `{prefix}tag list`
         Example: `{prefix}tag list @Rina#5251`
@@ -97,13 +99,13 @@ class Tags(Plugin):
             await interface.send_to(ctx.channel)
             close_interface_context(ctx, interface)
 
-    @tag.command('delete', usage='<tag name>')
+    @tag.command('delete')
     async def tag_delete(self, ctx, tag: Tag):
         """
-        Deletes a tag in the current server.
-        You can delete tags you own, or any tag if you have the Manage Messages permission.
+        Delete one of your own tags.
+        If you have the manage messages permission, you can delete others' tags.
 
-        Tag name is the name of an existing tag you want to delete.
+        Tag must be specified by its name.
 
         `Example: {prefix}tag delete "rule 1"`
         \u200b
@@ -116,14 +118,15 @@ class Tags(Plugin):
         else:
             await ctx.send('You do not own this tag!')
 
-    @tag.command('rename', usage='<old name> <new name>')
+    @tag.command('rename', usage='<tag> <new name>')
     async def tag_rename(self, ctx, tag: Tag, new_name: tag_name):
         """
-        Gives a tag in the current server a new name.
-        You can delete tags you own, or any tag if you have the Manage Messages permission.
+        Rename one of your own tags.
+        If you have the manage messages permission, you can rename others' tags.
 
-        Old name is the name of an existing tag.
-        New name can be any string up to 100 characters long, and must not already be taken.
+        Tag must be specified by its name.
+        New name can be any string up to 100 characters long.
+          Note: The name must not be taken by any other tags on the server.
 
         `Example: {prefix}tag rename SnowyLuma LostLuma`
         \u200b
@@ -137,44 +140,44 @@ class Tags(Plugin):
         else:
             await ctx.send('You do not own this tag!')
 
-    @tag.command('edit', usage='<tag name> <new content>')
-    async def tag_edit(self, ctx, tag: Tag, *, new_content: tag_content):
+    @tag.command('edit')
+    async def tag_edit(self, ctx, tag: Tag, *, content: tag_content):
         """
-        Edits a tag's content given it exists in the current server.
-        You can edit tags you own, or any tag if you have the Manage Messages permission.
+        Edit the content of one of your own tags
+        If you have the manage messages permission, you can also edit others' tags.
 
-        Tag name is the name of an existing tag.
-        New content can be any string up to 1998 characters long.
+        Tag must be specified by its name.
+        Content can be any string up to 1998 characters long.
 
         `Example: {prefix}tag edit "Planned events" No events are planned currently.`
         \u200b
         """
 
         if tag.owner_id == ctx.author.id or ctx.author.guild_permissions.manage_messages:
-            data = {'content': new_content}
+            data = {'content': content}
             await self.mousey.api.update_tag(ctx.guild.id, tag.id, data)
 
-            await ctx.send(f'Tag {tag.name} successfully edited to have new content: {shorten_content(new_content)}.')
+            await ctx.send(f'Tag {tag.name} successfully edited to have new content: {shorten_content(content)}.')
         else:
             await ctx.send('You do not own this tag!')
 
-    @tag.command('transfer', usage='<tag name> <new owner>')
-    async def tag_transfer(self, ctx, tag: Tag, new_owner: discord.Member):
+    @tag.command('transfer')
+    async def tag_transfer(self, ctx, tag: Tag, user: discord.Member):
         """
-        Transfers an existing tag in the server to a new owner.
-        You can transfers tags you own, or any tag if you have the Manage Messages permission.
+        Transfer a tag you own to someone else.
+        If you have the manage messages permission, you can transfer others' tags.
 
-        Tag name is the name of an existing tag.
-        New owner is a reference to a member of the current server.
+        Tag must be specified by its name.
+        User must be specified as a mention, ID, DiscordTag, or name.
 
         `Example: {prefix}tag transfer "rule 1" Rina#5251`
         \u200b
         """
 
         if tag.owner_id == ctx.author.id or ctx.author.guild_permissions.manage_messages:
-            data = {'user': serialize_user(new_owner)}
+            data = {'user': serialize_user(user)}
             await self.mousey.api.update_tag(ctx.guild.id, tag.id, data)
 
-            await ctx.send(f'Tag {tag.name} successfully transferred to {new_owner}.')
+            await ctx.send(f'Tag {tag.name} successfully transferred to {user}.')
         else:
             await ctx.send('You do not own this tag!')
